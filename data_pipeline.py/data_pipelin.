@@ -1,0 +1,57 @@
+import pandas as pd
+import json
+import re
+
+class LLMDataPipeline:
+    def __init__(self, raw_data_path):
+        self.raw_data_path = raw_data_path
+        self.df = None
+
+    def load_data(self):
+        """Simulates ingesting raw unaligned LLM outputs."""
+        print("[+] Ingesting raw LLM token outputs...")
+        # Mocking raw database/JSON input payload
+        mock_data = [
+            {"prompt_id": 101, "model_output": "The population of Abuja is roughly 3 million.", "token_count": 45, "status": "unverified"},
+            {"prompt_id": 102, "model_output": "Error 404: Connection timed out hallucination stream.", "token_count": 12, "status": "unverified"},
+            {"prompt_id": 103, "model_output": "To write a Python loop, use the 'for' keyword syntax.", "token_count": 120, "status": "unverified"},
+            {"prompt_id": 104, "model_output": "", "token_count": 0, "status": "failed"}
+        ]
+        self.df = pd.DataFrame(mock_data)
+        return self.df
+
+    def filter_and_normalize(self):
+        """Cleans, normalizes, and filters out system hallucinations/empty rows."""
+        print("[+] Normalizing dataset and running structural validation layers...")
+        
+        # 1. Drop completely empty model outputs
+        self.df = self.df[self.df['model_output'].str.strip() != ""]
+        
+        # 2. Flag potential hallucination/error vectors using regex
+        error_patterns = r"(Error \d+|timeout|hallucination)"
+        self.df['contains_hallucination'] = self.df['model_output'].str.contains(error_patterns, flags=re.IGNORECASE, regex=True)
+        
+        # 3. Clean and isolate token alignment ranges (drop extreme anomalies)
+        self.df = self.df[self.df['token_count'] > 5]
+        
+        # 4. Standardize evaluation status strings
+        self.df.loc[self.df['contains_hallucination'] == False, 'status'] = 'Verified_Clean'
+        self.df.loc[self.df['contains_hallucination'] == True, 'status'] = 'Flagged_Error'
+        
+        return self.df
+
+    def export_to_relational_schema(self):
+        """Simulates exporting audited records to a PostgreSQL schema layer."""
+        print("[+] Formatting schema for relational database ingestion...")
+        final_payload = self.df[['prompt_id', 'model_output', 'token_count', 'status']]
+        print(f"[Success] Processed {len(final_payload)} records cleanly.")
+        return final_payload.to_json(orient="records", indent=4)
+
+if __name__ == "__main__":
+    # Execute end-to-end local test pipeline simulation
+    pipeline = LLMDataPipeline(raw_data_path="mock_input.json")
+    pipeline.load_data()
+    pipeline.filter_and_normalize()
+    json_output = pipeline.export_to_relational_schema()
+    print(json_output)
+
